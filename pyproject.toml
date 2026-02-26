@@ -135,6 +135,7 @@ ocrbench = [
     "apted",
     "lxml",
     "Polygon3",
+    "ipdb",
 ]
 tui = [
     "fastapi>=0.100.0",
