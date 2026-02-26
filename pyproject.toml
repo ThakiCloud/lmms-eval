@@ -127,6 +127,15 @@ prismmbench = [
     "pdf2image>=1.17.0",
     "pdfplumber>=0.11.9"
 ]
+ocrbench = [
+    "jieba",
+    "distance",
+    "editdistance",
+    "python-Levenshtein",
+    "apted",
+    "lxml",
+    "Polygon3",
+]
 tui = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
