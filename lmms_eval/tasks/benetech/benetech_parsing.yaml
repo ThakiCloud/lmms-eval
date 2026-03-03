@@ -1,0 +1,41 @@
+dataset_path: parquet
+dataset_kwargs:
+  data_files:
+    test: /data/workspace/datasets/benetech_parsing/test.parquet
+task: "benetech_parsing"
+test_split: test
+output_type: generate_until
+doc_to_visual: !function utils.benetech_doc_to_visual
+doc_to_text: !function utils.benetech_doc_to_text
+doc_to_target: "data_series_json"
+generation_kwargs:
+  max_new_tokens: 2048
+  temperature: 0
+  do_sample: False
+process_results: !function utils.benetech_process_results
+metric_list:
+  - metric: benetech_overall
+    aggregation: mean
+    higher_is_better: true
+  - metric: benetech_ocr
+    aggregation: mean
+    higher_is_better: true
+  - metric: benetech_value
+    aggregation: mean
+    higher_is_better: true
+  - metric: benetech_type_acc
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  - version: 0.0
+lmms_eval_specific_kwargs:
+  default:
+    pre_prompt: ""
+    post_prompt: |
+      Extract the chart type and all data points from this chart image.
+      Return a JSON object with this exact format:
+      {"chart_type": "<type>", "data_series": [{"x": <value>, "y": <value>}, ...]}
+      where chart_type is one of: line, vertical_bar, horizontal_bar, scatter, dot.
+      For x values, use strings for categorical labels and numbers for numeric axes.
+      For y values, use numbers.
+      Return ONLY the JSON object, no other text.

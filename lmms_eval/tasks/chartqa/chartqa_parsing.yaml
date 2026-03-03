@@ -1,0 +1,40 @@
+dataset_path: parquet
+dataset_kwargs:
+  data_files:
+    test: /data/workspace/datasets/chartqa_parsing/test.parquet
+task: "chartqa_parsing"
+test_split: test
+output_type: generate_until
+doc_to_visual: !function utils.chartqa_parsing_doc_to_visual
+doc_to_text: !function utils.chartqa_parsing_doc_to_text
+doc_to_target: "table_csv"
+generation_kwargs:
+  max_new_tokens: 1024
+  temperature: 0
+  do_sample: False
+process_results: !function utils.chartqa_parsing_process_results
+metric_list:
+  - metric: parsing_overall
+    aggregation: mean
+    higher_is_better: true
+  - metric: parsing_label
+    aggregation: mean
+    higher_is_better: true
+  - metric: parsing_value
+    aggregation: mean
+    higher_is_better: true
+  - metric: robust_overall
+    aggregation: mean
+    higher_is_better: true
+  - metric: robust_label
+    aggregation: mean
+    higher_is_better: true
+  - metric: robust_value
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  - version: 0.0
+lmms_eval_specific_kwargs:
+  default:
+    pre_prompt: ""
+    post_prompt: "Extract all data from this chart as a markdown table."
