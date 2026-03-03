@@ -181,7 +181,7 @@ def _parse_markdown_table(md_string: str) -> list[list[str]]:
     table_lines = []
     for line in lines:
         line = line.strip()
-        if not line or not "|" in line:
+        if not line or "|" not in line:
             continue
         # 구분선 행 건너뜀 (| --- | --- | 등)
         cells = [c.strip() for c in line.strip("|").split("|")]

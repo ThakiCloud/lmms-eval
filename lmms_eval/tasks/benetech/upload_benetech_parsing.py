@@ -21,7 +21,7 @@ import os
 import datasets
 from PIL import Image
 
-BENETECH_ROOT = "/data/workspace/hongcheol/thaki-document-understanding/data/benetech/train"
+BENETECH_ROOT = os.environ.get("BENETECH_ROOT", "/data/workspace/datasets/benetech/train")
 
 _CITATION = """\
 @misc{benetech2023,
@@ -130,8 +130,7 @@ if __name__ == "__main__":
     print(f"Sample chart_type: {data[0]['chart_type']}")
     print(f"Sample num_points: {data[0]['num_points']}")
 
-    script_path = os.path.abspath(__file__)
-    output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_path)))), "data", "benetech_parsing")
+    output_dir = os.environ.get("BENETECH_OUTPUT_DIR", "/data/workspace/datasets/benetech_parsing")
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "test.parquet")
     data.to_parquet(output_path)

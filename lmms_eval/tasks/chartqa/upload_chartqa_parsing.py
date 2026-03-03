@@ -22,7 +22,7 @@ import os
 import datasets
 from PIL import Image
 
-CHARTQA_ROOT = "/data/workspace/hongcheol/ChartQA/ChartQA Dataset"
+CHARTQA_ROOT = os.environ.get("CHARTQA_ROOT", "/data/workspace/datasets/ChartQA/ChartQA Dataset")
 
 _CITATION = """\
 @inproceedings{masry-etal-2022-chartqa,
