@@ -137,6 +137,12 @@ ocrbench = [
     "Polygon3",
     "ipdb",
 ]
+table_parsing = [
+    "editdistance",
+    "apted",
+    "lxml",
+    "beautifulsoup4",
+]
 tui = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
