@@ -130,6 +130,6 @@ def table_parsing_aggregate_results(results, args):
             print(f"Mean TEDS: {mean_score:.4f}", file=f)
         logger.info(f"Table parsing results saved to {path}")
     except Exception:
-        pass
+        logger.opt(exception=True).error("Failed to save table_parsing_results.txt (mean_score={:.4f})", mean_score)
 
     return mean_score
