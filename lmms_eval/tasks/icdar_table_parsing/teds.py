@@ -205,3 +205,40 @@ class OCRMetric:
         max_len = max(len(pred_text), len(true_text))
         dist = editdistance.eval(pred_text, true_text)
         return 1.0 - (dist / max_len)
+
+
+# ---------------------------------------------------------------------------
+# Picklable worker functions for ProcessPoolExecutor (spawn mode).
+# Defined here because this module is importable by its fully-qualified name
+# (lmms_eval.tasks.icdar_table_parsing.teds), unlike the YAML-loaded utils.py.
+# ---------------------------------------------------------------------------
+
+
+def compute_teds_full(args: tuple) -> float:
+    pred_html, gt_html, _ = args
+    try:
+        return TEDS(structure_only=False).evaluate(pred_html, gt_html)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return 0.0
+
+
+def compute_teds_struct(args: tuple) -> float:
+    pred_html, gt_html, _ = args
+    try:
+        return TEDS(structure_only=True).evaluate(pred_html, gt_html)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return 0.0
+
+
+def compute_ocr(args: tuple) -> float:
+    pred_html, gt_html, _ = args
+    try:
+        return OCRMetric().evaluate(pred_html, gt_html)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return 0.0
