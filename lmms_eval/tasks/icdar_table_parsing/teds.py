@@ -220,6 +220,7 @@ def compute_teds_full(args: tuple) -> float:
         return TEDS(structure_only=False).evaluate(pred_html, gt_html)
     except Exception:
         import traceback
+
         traceback.print_exc()
         return 0.0
 
@@ -230,6 +231,7 @@ def compute_teds_struct(args: tuple) -> float:
         return TEDS(structure_only=True).evaluate(pred_html, gt_html)
     except Exception:
         import traceback
+
         traceback.print_exc()
         return 0.0
 
@@ -240,5 +242,6 @@ def compute_ocr(args: tuple) -> float:
         return OCRMetric().evaluate(pred_html, gt_html)
     except Exception:
         import traceback
+
         traceback.print_exc()
         return 0.0
