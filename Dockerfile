@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl wget ca-certificates \
+    git curl wget ca-certificates build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
