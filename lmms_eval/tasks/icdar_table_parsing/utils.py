@@ -1,15 +1,53 @@
 from __future__ import annotations
 
+import multiprocessing as mp
+import os
+import re
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 from loguru import logger
 
-from lmms_eval.tasks._task_utils.file_utils import generate_submission_file
-from lmms_eval.tasks.icdar_table_parsing.teds import TEDS, OCRMetric
-
-_teds_full = TEDS(structure_only=False)
-_teds_struct = TEDS(structure_only=True)
-_ocr_metric = OCRMetric()
+from lmms_eval.tasks.icdar_table_parsing.teds import (
+    compute_ocr,
+    compute_teds_full,
+    compute_teds_struct,
+)
 
 TABLE_PARSING_PROMPT = "Convert the table in the image to HTML format. Output only the HTML table code, starting with <table> and ending with </table>. Do not include any explanation."
+
+_NUM_WORKERS = int(os.environ.get("TEDS_NUM_WORKERS", min(os.cpu_count() or 1, 64)))
+
+
+def _parallel_compute(items: list[tuple[str, str, str]], fn) -> list[float]:
+    """Run *fn* on every item using a process pool and return ordered results.
+
+    Uses spawn context to avoid CUDA fork issues from vLLM parent process.
+    Worker functions must live in a properly-importable module (teds.py).
+    """
+    n = len(items)
+    if n == 0:
+        return []
+    workers = min(_NUM_WORKERS, n)
+    if workers <= 1:
+        return [fn(item) for item in items]
+
+    results: list[float] = [0.0] * n
+    ctx = mp.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as pool:
+        future_to_idx = {pool.submit(fn, item): i for i, item in enumerate(items)}
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                logger.warning("Worker failed for item {}: {}", idx, e)
+                results[idx] = 0.0
+    return results
+
+
+# ---------------------------------------------------------------------------
+# doc_to_* helpers
+# ---------------------------------------------------------------------------
 
 
 def table_parsing_doc_to_visual(doc):
@@ -57,8 +95,6 @@ def _extract_html_table(text: str) -> str:
     attributes (data-bbox, data-polygon), and extract <table> elements.
     Also handles markdown code blocks wrapping the output.
     """
-    import re
-
     code_block = re.search(r"```(?:html)?\s*(.*?)```", text, re.DOTALL)
     if code_block:
         text = code_block.group(1).strip()
@@ -78,58 +114,53 @@ def _extract_html_table(text: str) -> str:
     return text.strip()
 
 
+# ---------------------------------------------------------------------------
+# process_results – lightweight; defers expensive TEDS to aggregation phase
+# ---------------------------------------------------------------------------
+
+
 def table_parsing_process_results(doc, results):
+    """Return (pred_html, gt_html, table_type) tuples for each metric.
+
+    The actual TEDS / OCR scores are computed in parallel during aggregation
+    (see teds_aggregate, teds_struct_aggregate, ocr_aggregate below).
+    """
     pred_html = _extract_html_table(results[0])
     gt_html = doc["html"]
     table_type = doc.get("type", "unknown")
 
-    try:
-        teds_score = _teds_full.evaluate(pred_html, gt_html)
-    except Exception:
-        logger.warning("TEDS computation failed, defaulting to 0.0")
-        teds_score = 0.0
-
-    try:
-        teds_struct_score = _teds_struct.evaluate(pred_html, gt_html)
-    except Exception:
-        logger.warning("TEDS-struct computation failed, defaulting to 0.0")
-        teds_struct_score = 0.0
-
-    try:
-        ocr_score = _ocr_metric.evaluate(pred_html, gt_html)
-    except Exception:
-        logger.warning("OCR metric computation failed, defaulting to 0.0")
-        ocr_score = 0.0
-
-    result = {
-        "teds": teds_score,
-        "teds_struct": teds_struct_score,
-        "ocr": ocr_score,
+    data = (pred_html, gt_html, table_type)
+    return {
+        "teds": data,
+        "teds_struct": data,
+        "ocr": data,
     }
 
-    if table_type == "simple":
-        result["teds_simple"] = teds_score
-        result["teds_struct_simple"] = teds_struct_score
-    elif table_type == "complex":
-        result["teds_complex"] = teds_score
-        result["teds_struct_complex"] = teds_struct_score
 
-    return result
+# ---------------------------------------------------------------------------
+# Aggregation – parallel TEDS / OCR computation across all samples
+# ---------------------------------------------------------------------------
 
 
-def table_parsing_aggregate_results(results, args):
-    """Aggregate per-sample results and save detailed report."""
-    if not results:
-        return 0.0
-    mean_score = sum(results) / len(results)
+def teds_aggregate(items: list[tuple[str, str, str]]) -> float:
+    """Compute TEDS (structure + content) for all samples in parallel."""
+    workers = min(_NUM_WORKERS, len(items))
+    logger.info("Computing TEDS for {} samples with {} workers", len(items), workers)
+    scores = _parallel_compute(items, compute_teds_full)
+    return sum(scores) / len(scores) if scores else 0.0
 
-    try:
-        path = generate_submission_file("table_parsing_results.txt", args, subpath="results")
-        with open(path, "w") as f:
-            print(f"Table Parsing Results ({len(results)} samples)", file=f)
-            print(f"Mean TEDS: {mean_score:.4f}", file=f)
-        logger.info(f"Table parsing results saved to {path}")
-    except Exception:
-        logger.opt(exception=True).error("Failed to save table_parsing_results.txt (mean_score={:.4f})", mean_score)
 
-    return mean_score
+def teds_struct_aggregate(items: list[tuple[str, str, str]]) -> float:
+    """Compute TEDS-struct (structure only) for all samples in parallel."""
+    workers = min(_NUM_WORKERS, len(items))
+    logger.info("Computing TEDS-struct for {} samples with {} workers", len(items), workers)
+    scores = _parallel_compute(items, compute_teds_struct)
+    return sum(scores) / len(scores) if scores else 0.0
+
+
+def ocr_aggregate(items: list[tuple[str, str, str]]) -> float:
+    """Compute OCR similarity for all samples in parallel."""
+    workers = min(_NUM_WORKERS, len(items))
+    logger.info("Computing OCR metric for {} samples with {} workers", len(items), workers)
+    scores = _parallel_compute(items, compute_ocr)
+    return sum(scores) / len(scores) if scores else 0.0

@@ -15,13 +15,13 @@ generation_kwargs:
 process_results: !function utils.table_parsing_process_results
 metric_list:
   - metric: teds
-    aggregation: mean
+    aggregation: !function utils.teds_aggregate
     higher_is_better: true
   - metric: teds_struct
-    aggregation: mean
+    aggregation: !function utils.teds_struct_aggregate
     higher_is_better: true
   - metric: ocr
-    aggregation: mean
+    aggregation: !function utils.ocr_aggregate
     higher_is_better: true
 lmms_eval_specific_kwargs:
   default:
